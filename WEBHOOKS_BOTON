@@ -1,0 +1,90 @@
+#include <WiFi.h> //LIBRERIA DE WIFI
+#include <WiFiClientSecure.h> //LIBRERIA PARA REALIZAR EL POST
+static const int BOTON = 25;
+//int BOTON = LOW;
+ 
+//CREDENCIALES DEL WI-FI
+const char* ssid = "TeknoFriendz";
+const char* password = "abcd24138julian";
+
+//DIRECCIÓN PARA HACER EL POST
+const char* host = "maker.ifttt.com";
+const int httpsPort = 443;
+
+ 
+void setup() {
+  Serial.begin(115200); //MONITOR SERIAL
+  Serial.println();
+  
+  //CONEXIÓN A LA RED WI-FI
+  Serial.print("Conectando a ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
+  //TIEMPO DE ESPERA DE CONEXIÓN
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  
+  //CONEXIÓN EXITOSA
+  Serial.println("");
+  Serial.println("WiFi conectado");
+  Serial.println("Direccion IP: ");
+  Serial.println(WiFi.localIP());
+
+  //INICIALIZACION DEL BOTON
+  pinMode(BOTON, INPUT);
+}
+
+ 
+
+void loop() {
+
+  //CICLO PARA SABER EL ESTADO DEL BOTON
+  if(digitalRead(BOTON)){
+    
+    //POST EN IFTTT
+    WiFiClientSecure client;
+    Serial.print("Conectando a ");
+    Serial.println(host);
+  
+    if (!client.connect(host, httpsPort)) {
+      Serial.println("Conexion fallida");
+      return;
+    }
+  
+    //DIRECCIÓN ÚNICA CON LLAVE PRIVADA
+    String url = "/trigger/ESP32/with/key/ldiVtPqqGcbg98-PGf37sQ_nif7rv6xRbCdTNmQPTPy";
+  
+    //REALIZACIÓN DEL REQUEST
+    Serial.print("Request del la llave IFTTT: ");
+    Serial.println(url);
+  
+    //LO QUE RECIBE DEL GET
+    client.print(String("GET ") + url + " HTTP/1.1\r\n" + "Host: " + host + "\r\n" +
+                 "User-Agent: BuildFailureDetectorESP32\r\n" + "Connection: close\r\n\r\n");
+  
+    Serial.println("request sent");
+  
+    //ESPERANDO LAS RESPUESTAS
+    while (client.connected()) {
+      String line = client.readStringUntil('\n');
+      if (line == "\r") {
+        Serial.println("Headers recibidos");
+        break;
+      }
+    }
+  
+    String line = client.readStringUntil('\n');
+  
+    //RESPUESTA DE IFTTT
+    Serial.println("La respuesta fue:");
+    Serial.println("==========");
+    Serial.println(line);
+    Serial.println("==========");
+    Serial.println("Cerrando conexion");
+    
+  }
+
+}
