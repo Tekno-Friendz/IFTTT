@@ -1,17 +1,18 @@
 #include <WiFi.h>
 #include "time.h"
+#include "BLEDevice.h"
 #include <WiFiClientSecure.h>
 
-//Wifi Settings
-const char* ssid = "TeknoFriendz";
-const char* password = "abcd24138julian";
+//CREDENCIALES DEL WI-FI
+const char* ssid = "TeknoFriendz"; //NOMBRE DE RED
+const char* password = "xxxxxxx"; //CLAVE
 
 const char host[] = "maker.ifttt.com";
 const int httpsPort = 443;
 
-String url = "/trigger/ESP32/with/key/ldiVtPqqGcbg98-PGf37sQ_nif7rv6xRbCdTNmQPTPy";
+String url = "/trigger/ESP32/with/key/ldiVtPqqGcbg98-PGf37sQ_nif7rv6xRbCxxxxxxx"; //LLAVE UNICA
 
-//Date & Time Settings
+//CONFIGURACION DE FECHA Y HORA
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = -18000;
 const int   daylightOffset_sec = 0;
@@ -19,13 +20,12 @@ bool darktime = false;
 int H;
 
 
-//BLE Settings
-#include "BLEDevice.h"
+//CONFIGURACION DE BLE
 static BLEAddress *pServerAddress;
 BLEScan* pBLEScan;
 BLEClient*  pClient;
 bool deviceFound = false;
-String knownAddresses[] = {"e4:31:9c:61:a6:29"};
+String knownAddresses[] = {"e4:56:9c:61:a6:80"}; //REEMPLAZAR POR LA DIRECCION MAC DEL BEACON
 bool cont = true;
 
 class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
@@ -42,7 +42,7 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
         if (strcmp(pServerAddress->toString().c_str(), knownAddresses[i].c_str()) == 0) known = true;
       }
       if (known) {
-        Serial.print("Device found: ");
+        Serial.print("Dispositivo encontrado: ");
         Serial.println(advertisedDevice.getRSSI());
         if (advertisedDevice.getRSSI() > -80) deviceFound = true;
         else deviceFound = false;
@@ -55,17 +55,17 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 
 
 void setup() {
+  //MONITOR SERIAL
   Serial.begin(115200);
-
-  Serial.println("Scanning...");
+  Serial.println("Escanenado...");
 
   BLEDevice::init("");
   pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
 
-  //BLE Initialization
-  Serial.println("Starting Arduino BLE Client application...");
+  //INICIALIZACION DEL BLE
+  Serial.println("Comenzanco la aplicacion BLE de Arduino...");
 
   BLEDevice::init("");
 
@@ -75,9 +75,9 @@ void setup() {
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pBLEScan->setActiveScan(true);
   
-  //Initializing Wifi
+  //IINICIALIZACION WI-FI
   Serial.println();
-  Serial.print("Connecting to ");
+  Serial.print("Conectando a ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
 
@@ -87,8 +87,8 @@ void setup() {
   }
 
   Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("\nIP address: ");
+  Serial.println("WiFi conectado");
+  Serial.println("\nDireccion IP: ");
   Serial.println(WiFi.localIP());
 
   //Initializing ntp server
@@ -101,34 +101,40 @@ void loop() {
 
   
   Serial.println();
-  Serial.println("BLE Scan restarted.....");
+  Serial.println("Escaneo BLE reiniciado.....");
   deviceFound = false;
   BLEScanResults scanResults = pBLEScan->start(30);
   
+  //OBTENCION DE LA FECHA Y HORA
   struct tm timeinfo;
   H = timeinfo.tm_hour;
   if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
+    Serial.println("Falla en obtener la hora");
     darktime = false;
   }
+  
+  //CONDICIONAL DE FRANJAS HORARIAS
   else if ( ( H < 24 && H > 17 ) || (H < 5) ){
     Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
     darktime = true;
     }
   Serial.println(darktime);
   Serial.println(H);
+  
+  //CONDICIONAL SI ES MAS DE LAS 6 PM Y EL DISPOSITIVO FUE ENCONTRADO
   if (deviceFound && cont && darktime) {  
     cont = false;
     WiFiClientSecure client;
-    Serial.print("\nConnecting to ");
+    Serial.print("\nConectando a ");
     Serial.println(host);
     
     if (!client.connect(host, httpsPort)) {
-      Serial.println("connection failed");
+      Serial.println("Conexion fallida");
       return;
     }
-
-    Serial.print("Requesting URL: ");
+ 
+    //ENVIAR MENSAJE IFTTT
+    Serial.print("Requerimiento a IFTTT: ");
     Serial.println(url);
     client.print(String("GET ") + url + " HTTP/1.1\r\n" +
 
@@ -137,7 +143,9 @@ void loop() {
                "User-Agent: BuildFailureDetectorESP32\r\n" +
 
                "Connection: close\r\n\r\n");
-    Serial.println("Request sent");
+    Serial.println("Requerimiento enviado");
+    
+    //CONEXION CON IFTTT
     while (client.connected()) {
         String line = client.readStringUntil('\n');
         if (line == "\r") {
@@ -147,20 +155,22 @@ void loop() {
       }
     String line = client.readStringUntil('\n');
     
-    Serial.println("reply was:");
+    Serial.println("La respuesta fue:");
     Serial.println(line);
     Serial.println("==========");
     
-    //Serial.println("Waiting for 60 seconds");
+    //Serial.println("Esperando 60 segundos");
     //Serial.println("==========");
     delay(60000);
   }
+  
+  //VOLVER A BUSCAR EL DISPOSITIVO
   else if (!deviceFound) {
-    Serial.println("Device not found");
+    Serial.println("Dispositivo no encontrado");
     cont = true;
   }
   else if (!cont && deviceFound) {
-    Serial.println("\nActivity already triggered");
+    Serial.println("\nYa se ha enviado el POST");
     delay(600000);
   }
 }
