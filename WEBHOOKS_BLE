@@ -1,0 +1,166 @@
+#include <WiFi.h>
+#include "time.h"
+#include <WiFiClientSecure.h>
+
+//Wifi Settings
+const char* ssid = "TeknoFriendz";
+const char* password = "abcd24138julian";
+
+const char host[] = "maker.ifttt.com";
+const int httpsPort = 443;
+
+String url = "/trigger/ESP32/with/key/ldiVtPqqGcbg98-PGf37sQ_nif7rv6xRbCdTNmQPTPy";
+
+//Date & Time Settings
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = -18000;
+const int   daylightOffset_sec = 0;
+bool darktime = false;
+int H;
+
+
+//BLE Settings
+#include "BLEDevice.h"
+static BLEAddress *pServerAddress;
+BLEScan* pBLEScan;
+BLEClient*  pClient;
+bool deviceFound = false;
+String knownAddresses[] = {"e4:31:9c:61:a6:29"};
+bool cont = true;
+
+class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
+    /**
+        Called for each advertising BLE server.
+    */
+    void onResult(BLEAdvertisedDevice advertisedDevice) {
+      Serial.print("BLE Advertised Device found: ");
+      Serial.println(advertisedDevice.toString().c_str());
+      pServerAddress = new BLEAddress(advertisedDevice.getAddress());
+
+      bool known = false;
+      for (int i = 0; i < (sizeof(knownAddresses) / sizeof(knownAddresses[0])); i++) {
+        if (strcmp(pServerAddress->toString().c_str(), knownAddresses[i].c_str()) == 0) known = true;
+      }
+      if (known) {
+        Serial.print("Device found: ");
+        Serial.println(advertisedDevice.getRSSI());
+        if (advertisedDevice.getRSSI() > -80) deviceFound = true;
+        else deviceFound = false;
+        Serial.println(pServerAddress->toString().c_str());
+        advertisedDevice.getScan()->stop();
+      }
+    }
+}; // MyAdvertisedDeviceCallbacks
+
+
+
+void setup() {
+  Serial.begin(115200);
+
+  Serial.println("Scanning...");
+
+  BLEDevice::init("");
+  pBLEScan = BLEDevice::getScan(); //create new scan
+  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
+
+  //BLE Initialization
+  Serial.println("Starting Arduino BLE Client application...");
+
+  BLEDevice::init("");
+
+  pClient  = BLEDevice::createClient();
+  Serial.println(" - Created client");
+  pBLEScan = BLEDevice::getScan();
+  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+  pBLEScan->setActiveScan(true);
+  
+  //Initializing Wifi
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("\nIP address: ");
+  Serial.println(WiFi.localIP());
+
+  //Initializing ntp server
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+}
+
+  
+void loop() {
+
+  
+  Serial.println();
+  Serial.println("BLE Scan restarted.....");
+  deviceFound = false;
+  BLEScanResults scanResults = pBLEScan->start(30);
+  
+  struct tm timeinfo;
+  H = timeinfo.tm_hour;
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    darktime = false;
+  }
+  else if ( ( H < 24 && H > 17 ) || (H < 5) ){
+    Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+    darktime = true;
+    }
+  Serial.println(darktime);
+  Serial.println(H);
+  if (deviceFound && cont && darktime) {  
+    cont = false;
+    WiFiClientSecure client;
+    Serial.print("\nConnecting to ");
+    Serial.println(host);
+    
+    if (!client.connect(host, httpsPort)) {
+      Serial.println("connection failed");
+      return;
+    }
+
+    Serial.print("Requesting URL: ");
+    Serial.println(url);
+    client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+
+               "Host: " + host + "\r\n" +
+
+               "User-Agent: BuildFailureDetectorESP32\r\n" +
+
+               "Connection: close\r\n\r\n");
+    Serial.println("Request sent");
+    while (client.connected()) {
+        String line = client.readStringUntil('\n');
+        if (line == "\r") {
+        Serial.println("headers received");
+        break;
+        }
+      }
+    String line = client.readStringUntil('\n');
+    
+    Serial.println("reply was:");
+    Serial.println(line);
+    Serial.println("==========");
+    
+    //Serial.println("Waiting for 60 seconds");
+    //Serial.println("==========");
+    delay(60000);
+  }
+  else if (!deviceFound) {
+    Serial.println("Device not found");
+    cont = true;
+  }
+  else if (!cont && deviceFound) {
+    Serial.println("\nActivity already triggered");
+    delay(600000);
+  }
+}
