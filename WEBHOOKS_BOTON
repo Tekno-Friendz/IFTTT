@@ -4,8 +4,8 @@ static const int BOTON = 25;
 //int BOTON = LOW;
  
 //CREDENCIALES DEL WI-FI
-const char* ssid = "TeknoFriendz";
-const char* password = "abcd24138julian";
+const char* ssid = "TeknoFriendz"; //NOMBRE DE RED
+const char* password = "xxxxxxx"; //CLAVE
 
 //DIRECCIÓN PARA HACER EL POST
 const char* host = "maker.ifttt.com";
@@ -55,7 +55,7 @@ void loop() {
     }
   
     //DIRECCIÓN ÚNICA CON LLAVE PRIVADA
-    String url = "/trigger/ESP32/with/key/ldiVtPqqGcbg98-PGf37sQ_nif7rv6xRbCdTNmQPTPy";
+    String url = "/trigger/ESP32/with/key/ldiVtPqqGcbg98-PGf37sQ_nif7rv6xRbCxxxxx"; //LLAVE UNICA
   
     //REALIZACIÓN DEL REQUEST
     Serial.print("Request del la llave IFTTT: ");
